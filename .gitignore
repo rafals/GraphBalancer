@@ -1,0 +1,20 @@
+# nodemon
+nodemon-ignore
+
+# śmieci generowane przez cluster
+
+pids/*
+logs/*
+*.sock
+
+# śmieci generowane przez Maca
+
+.DS_Store
+Icon?
+
+# Thumbnails
+._*
+
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes
