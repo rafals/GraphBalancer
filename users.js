@@ -166,7 +166,6 @@ var balances = function(me, graph) {
   // me to identyfikator użytkownika, dla którego wyliczamy salda znajomych
   var balances = {}; // salda wyliczone w obrębie grup wspólnych znajomych (zaqpki 2)
   var activities = {}; // graf płynności
-  var paths = {}; // płynności ścieżek prowadzących od każdego ogniwa do nas
   
   _(graph).each(function(node, nid) {
     
