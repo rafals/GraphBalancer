@@ -8,24 +8,12 @@ app.get('/', function(req,res) {
   res.send('Try json API');
 });
 
-// helper, który skraca kod odpowiedzialny za http api
-// generator callbacków, przyjmuje oczekiwany kod odpowiedzi bazy danych
-// oraz response i next do sterowania przepływem
 function expect(expectedCode, res, next) {
   return function(code, docs) {
     if (code == expectedCode) {
       res.send(docs, expectedCode);
     } else {
       next(docs);
-      // błędy nie są obsługiwane lokalnie, tylko delegowane dalej
-      // aktualnie trafiają do middleware'a dostarczonego z frameworkiem, patrz config.js:
-      //       app.configure('development', function(){
-      //         app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
-      //       });
-      // 
-      //       app.configure('production', function(){
-      //         app.use(express.errorHandler());
-      //       });
     }
   }
 }

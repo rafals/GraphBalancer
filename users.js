@@ -77,7 +77,7 @@ var design = {
           }
           var result = {};
           // wyciągamy ilości transakcji z 6 ostatnich miesięcy (lub 0 przy braku danych)
-          for(var limit = lastMonth - 6; lastMonth > limit; lastMonth--) {
+          for(var limit = lastMonth - 12; lastMonth > limit; lastMonth--) {
             result[lastMonth] = as[lastMonth] || 0;
           }
           return result;
@@ -164,28 +164,61 @@ var friends = module.exports.friends = function(id, callback) {
 
 var balances = function(me, graph) {
   // me to identyfikator użytkownika, dla którego wyliczamy salda znajomych
+  // od tej pory opisywany w pierwszej osobie
   var balances = {}; // salda wyliczone w obrębie grup wspólnych znajomych (zaqpki 2)
   var activities = {}; // graf płynności
-  
+  var paths = {}; // graf ścieżek od naszych znajomych do nas
+  var weightSums = {}; // suma wag ścieżek każdego znajomego
+  var finalBalances = {};
+  // tworzymy graf płynności między ludźmi, którzy są naszymi znajomymi
+  // oraz tworzymy współdzielone salda w stylu zaqpków 2
   _(graph).each(function(node, nid) {
     
     balances[nid] = 0;
+    finalBalances[nid] = 0;
     activities[nid] = {};
     
     _(node).each(function(connection, cid) {
-      if(graph[me][cid]) { // to jest nasz znajomych
+      if(graph[me][cid]) { // jeśli to jest nasz znajomy
         
         balances[nid] -= connection.balance;
         if(nid != cid) { // pomijamy powiązania z samym sobą
           activities[nid][cid] = activity(connection);
         }
       }
+    });  
+  });
+  
+  // na podstawie grafu płynności tworzymy graf ścieżek od każdego węzła do nas
+  // waga każdej ścieżki jest oparta na płynności
+  _(activities).each(function(node, nid) {
+    if(nid != me) {
+      paths[nid] = {};
+      weightSums[nid] = 0; 
+      _(node).each(function(connection, cid) {
+        if(cid == me) {
+          weightSums[nid] += paths[nid][cid] = activities[nid][cid];
+        } else {
+          weightSums[nid] += paths[nid][cid] = Math.min(activities[nid][cid], activities[me][cid]);
+        }
+      });
+    }
+  });
+  
+  // saldo każdego ze znajomych rozprowadzamy wedle grafu ścieżek
+  _(paths).each(function(node, nid) {
+    _(node).each(function(connection, cid) {
+      if (cid == me) {
+        finalBalances[nid] += balances[nid] * paths[nid][cid] / weightSums[nid];
+      } else {
+        finalBalances[cid] += balances[nid] * paths[nid][cid] / weightSums[nid];
+      }
     });
   });
   
-  // TODO uwzględnić płynności w saldach
+  finalBalances[me] = balances[me];
   
-  return balances;
+  return finalBalances;
 }
 
 function activity(userStats) {
@@ -195,16 +228,14 @@ function activity(userStats) {
   var stats = userStats.stats;
   var date = new Date();
   var currentMonth = date.getFullYear()*12 + date.getMonth();
-  var fiveMonthsAgo = currentMonth - 5;
   
-  var result = userStats.transactions;
-  
-  var month;
-  for(var i = 1; i <= 6; i++) {
-    month = fiveMonthsAgo + i;
-    result += (stats[month] && Math.pow(2, i) * stats[month]) || 0;
+  function weight(month) {
+    return 12 - (currentMonth - month);
   }
   
+  var result = _(stats).chain().map(function(val, key) { return val * weight(key) })
+    .reduce(function(a,b) { return a + b; }).value();
+    
   return result;
 }
 
@@ -221,14 +252,14 @@ if (!module.parent) {
     });
   
   } else if (command == 'get') {
-    var id = argv._[1] || argv.i || argv.id || argv.key || 0
+    var id = argv._[1] || argv.i || argv.id || argv.key || 0;
     out.info("getting " + db.url + "/_design/users/_view/all?group=true&key=" + id);
-    get(id, {}, function(code, doc) {
+    get(id, function(code, doc) {
       out.expect(200, code, doc);
     });
     
   } else if (command == 'friends') {
-    var id = argv._[1] || argv.i || argv.id || argv.key || 0
+    var id = argv._[1] || argv.i || argv.id || argv.key || 0;
     out.info("getting and calculating friends");
     friends(id, function(code, doc) {
       out.expect(200, code, doc);
